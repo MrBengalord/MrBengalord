@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galx:GPT</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='img/shortcut.png') }}" />
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <div class="hamburger">
+                <div class="line"></div>
+                <div class="line"></div>
+                <div class="line"></div>
+            </div>
+            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Galx Logo" class="logo">
+        </div>
+        <form action="/clear_session" method="POST">
+            <button type="submit" class="clear-button" title="Очистить сессию">
+                <i class="fas fa-trash-alt"></i>
+            </button>
+        </form>
+    </header>
+
+    <!-- Сайдбар -->
+    <div id="sidebar" class="sidebar">
+        <div class="hamburger white">
+            <div class="line"></div>
+            <div class="line"></div>
+            <div class="line"></div>
+        </div>
+        <p style="padding: 20px;">Мы работаем над развитием продукта и в скором времени здесь появится новый функционал</p>
+    </div>
+    <!-- Конец Сайдбара -->
+
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="container"id="box">
+        {% if history %}
+        <ul class="conversation" id="box_1">
+            {% for prompt, answer in history %}
+                <li class="prompt">
+                    <strong>Вы:</strong> {{ prompt }}
+                </li>
+                <span class="answer-content">
+                    <img src="{{ url_for('static', filename='img/avatar.png') }}" alt="Avatar" class="avatar-icon">
+                    <li class="answer">
+                        <pre>{{ answer|safe }}</pre> 
+                    </li>
+                </span>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+
+    <div class="loader" id="loader"></div>
+    <div class="overlay" id="overlay"></div>
+
+
+    <form action="/" method="POST" enctype="multipart/form-data" id="uploadForm">
+       <footer class="footer">
+            <div class="footer-container">
+                
+                <div class="switcher-container">
+                    <label class="switch">  
+                        <input type="checkbox" name="create_image" id="create_image_checkbox" onclick="hideAttachment()">
+                        <span class="slider round"></span>
+                    </label>
+                    <span class="switch-label">DALL-E</span>
+                    <div id="tooltip" class="tooltip" title="Включить Далли">
+                        <span class="tooltip-text">
+                            В этом режиме ИИ не видит предыдущей истории переписки. Вам необходимо подробно описать, какое изображение вы хотите сгенерировать.
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="switcher-container_1">
+                    <label class="switch">  
+                        <input type="checkbox" name="web_search" id="web_search" onclick="hideAttachment_2();">
+                        <span class="slider round"></span>
+                    </label>
+                    <span class="switch-label_1">Web-search</span>
+                    <div id="tooltip_1" class="tooltip_1" title="Включить веб-серч">
+                        <span class="tooltip-text">
+                            В этом режиме ИИ не видит предыдущей истории переписки. Вам необходимо написать ваш запрос, а ГПТ найдет информацию по вашему запросу из интернета.
+                        </span>
+                    </div>
+                </div>  
+                 
+                <div class="input-container">
+                    <div>
+                        <!-- <input type="file" id="file" name="file" accept=".txt,.pdf,.png,.jpg,.jpeg,.csv,.xlsx,.xls,.xlsm,.doc,.docx" style="display: none;" onchange="validateFile(); displayFileName();"> -->
+                        <input type="file" id="file" name="file" accept=".png,.jpg,.jpeg" style="display: none;" onchange="validateFile(); displayFileName();">
+                        <label for="file" class="button left" id="leftButton" title="Приложить файл">
+                            <i class="fas fa-paperclip"></i>
+                        </label>
+                    </div>
+                    <div id="file-name-container" style="position: fixed; bottom: 10px; left: 10px; background-color: rgba(0, 0, 0, 0.7); color: white; padding: 5px 10px; border-radius: 5px; display: none;">
+                        <span id="file-name"></span>
+                        <span id="remove-file" style="cursor: pointer; margin-left: 10px;">&times;</span>
+                    </div>
+                    <textarea rows="1" class="input_promt" id="prompt_field" name="prompt_field" placeholder="Введите запрос">{{ error_message if error_message else request.form.prompt if request.form else '' }}</textarea>
+                    <button class="button right" type="submit" title="Начать анализ">
+                        <i class="fas fa-arrow-up"></i>
+                    </button>
+                </div>  
+            </div>
+            <p class="centered-text">
+                GalxGPT может допускать ошибки. Убедитесь, что вы проверяете важную информацию.
+            </p>
+            <div class="help-buttons-container">
+                <!-- <button type="button" class="help-button" onclick="window.open('https://another-link.com', '_blank');">
+                    <i class="fas fa-info"></i> 
+                </button> -->
+            <button type="button" class="help-button" title="Обратитесь к нам" onclick="window.open('https://jira.rore.group/CreateIssue.jspa?issuetype=10002&pid=12600', '_blank'); ">
+                <i class="fas fa-question"></i>
+            </button>
+
+        </div>
+        </footer>
+    </form>
+
+
+<script>
+
+    window.addEventListener('load', () => {
+        window.scrollTo(0, document.body.scrollHeight);
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+
+        dalle_status = false;
+        webgpt_status = false;
+        // console.log('Checkbox initially set to:', dalleLabel.checked); // Отладка
+
+        // Получаем элементы
+        const tooltip = document.getElementById('tooltip');
+        const tooltip_1 = document.getElementById('tooltip_1');
+        const closeTooltip = document.getElementById('close-tooltip');
+        const fileInput = document.getElementById('file');
+        const fileNameContainer = document.getElementById('file-name-container');
+        const fileName = document.getElementById('file-name');
+
+    });
+
+    function simulateDalleClick() {
+        // Найдем элемент лейбла по его id
+        var create_image_checkbox = document.getElementById('create_image_checkbox');
+        // Вызовем событие клика на лейбле
+        create_image_checkbox.click();
+        tooltip.style.display = 'none';
+    }
+    function simulateWebClick() {
+        // Найдем элемент лейбла по его id
+        var web_search = document.getElementById('web_search');
+        // Вызовем событие клика на лейбле
+        web_search.click();
+        tooltip_1.style.display = 'none';
+    }
+    function hideAttachment() {
+        //  const storedValue = localStorage.getItem('myVariable'); // Загружаем значение
+        //  const myVariable = JSON.parse(storedValue); // Преобразуем строку обратно в boolean
+        const fileInput = document.getElementById('file');
+        const fileNameContainer = document.getElementById('file-name-container');
+        const fileName = document.getElementById('file-name');
+        if(dalle_status === false) {
+            if (webgpt_status === true) {
+                simulateWebClick();
+            }
+            document.getElementById('leftButton').style.visibility = 'hidden';
+            dalle_status = true;
+            // window.alert("Включаем");
+            
+            // Если подсказка скрыта, показываем её, иначе скрываем
+            tooltip.style.display = 'block';
+            // Очищаем значение input типа file 
+            fileInput.value = '';
+            fileNameContainer.style.display = 'none';
+            fileName.value = '';
+        } else {
+            document.getElementById('leftButton').style.visibility = 'visible';
+            dalle_status = false;
+
+            // window.alert(myVariable);
+            // window.alert("Выключаем");
+            tooltip.style.display = 'none';
+        }
+    }
+
+    function hideAttachment_2() {
+        //  const storedValue = localStorage.getItem('myVariable'); // Загружаем значение
+        //  const myVariable = JSON.parse(storedValue); // Преобразуем строку обратно в boolean
+
+        const fileInput = document.getElementById('file');
+        const fileNameContainer = document.getElementById('file-name-container');
+        const fileName = document.getElementById('file-name');
+        if(webgpt_status === false) {
+            if (dalle_status === true) {
+                simulateDalleClick();
+            }
+            document.getElementById('leftButton').style.visibility = 'hidden';
+            webgpt_status = true;
+            // window.alert("Включаем");
+    
+            // Если подсказка скрыта, показываем её, иначе скрываем
+            tooltip_1.style.display = 'block';
+            // Очищаем значение input типа file 
+        
+            fileInput.value = '';              
+            fileNameContainer.style.display = 'none';
+            fileName.value = '';
+        } else {
+            document.getElementById('leftButton').style.visibility = 'visible';
+            webgpt_status = false;
+            // window.alert(myVariable);
+            // window.alert("Выключаем");
+            tooltip_1.style.display = 'none';
+        }
+    }
+
+    document.getElementById('prompt_field').addEventListener('keydown', function(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault(); // Prevents adding a new line
+            document.querySelector('.button.right').click(); // Triggers the submit button
+        }
+    });
+
+    document.getElementById('uploadForm').addEventListener('submit', function(event) {
+                // console.log('Форма отправлена, showing loader');
+                document.getElementById('loader').style.display = 'block';
+                document.getElementById('overlay').style.display = 'block';
+            });
+
+            window.addEventListener('load', function() {
+                // console.log('Page loaded, showing loader');
+                // document.getElementById('loader').style.display = 'block';
+                // document.getElementById('overlay').style.display = 'block';
+
+                setTimeout(() => {
+                    document.getElementById('loader').style.display = 'none';
+                    document.getElementById('overlay').style.display = 'none';
+                }, 1); // Задержка 0.01 секунда
+            });
+    
+    
+    function validateFile() {
+        const fileInput = document.getElementById('file');
+        const filePath = fileInput.value;
+        const file = fileInput.files[0];
+        const maxSize = 5 * 1024 * 1024; // 5 MB
+        // const allowedExtensions = /(\.txt|\.pdf|\.png|\.jpg|\.jpeg|\.csv|\.xlsx|\.xls|\.xlsm|\.doc|\.docx|)$/i;
+        const allowedExtensions = /(\.png|\.jpg|\.jpeg|)$/i;
+
+        if (!allowedExtensions.exec(filePath)) {
+            // alert('Invalid file type. Allowed types are: txt, pdf, png, jpg, jpeg, csv, xlsx, xls, xlsm, doc, docx.');
+            alert('Invalid file type. Allowed types are: png, jpg, jpeg');
+            fileInput.value = '';
+            return false;
+        }
+
+        if (file.size > maxSize) {
+            alert('File size exceeds 5 MB limit.');
+            fileInput.value = '';
+            return false;
+        }
+
+        return true;
+    }
+
+    function displayFileName() {
+        const fileInput = document.getElementById('file');
+        const fileNameContainer = document.getElementById('file-name-container');
+        const fileName = document.getElementById('file-name');
+
+        if (fileInput.files.length > 0) {
+            fileName.textContent = `Выбран файл: ${fileInput.files[0].name}`;
+            fileNameContainer.style.display = 'block';
+        } else {
+            fileNameContainer.style.display = 'none';
+        }
+    }
+
+    document.getElementById('remove-file').addEventListener('click', function() {
+        const fileInput = document.getElementById('file');
+        const fileNameContainer = document.getElementById('file-name-container');
+        
+        // Очищаем значение input типа file
+        fileInput.value = '';
+        
+        // Скрываем контейнер с названием файла
+        fileNameContainer.style.display = 'none';
+    });
+    
+    function clearFileInput() {
+        const fileInput = document.getElementById('file');
+        if (fileInput) {
+            fileInput.value = '';  // Очищаем значение input
+            const fileNameSpan = document.getElementById('file-name');
+            
+        }
+    }
+
+    function toggleSidebar() {
+        sidebar.classList.toggle('show');
+    }
+
+    function registerHamburgerEvents() {
+        document.querySelectorAll('.hamburger').forEach(element => {
+            element.addEventListener('click', toggleSidebar);
+        });
+    }
+
+    // Функция для перерегистрации событий
+    function reRegisterEvents() {
+        const newForm = document.getElementById('uploadForm');
+
+        const allTextAreas = document.querySelectorAll('textarea.auto');
+        allTextAreas.forEach(el => {
+            el.setAttribute('style', 'height: ' + el.scrollHeight + 'px');
+            el.removeEventListener('input', adjustTextAreaHeight); // Удаляем старый обработчик
+            el.addEventListener('input', adjustTextAreaHeight);   // Добавляем новый
+        });
+
+        const paperclipButton = document.querySelector('label[for="file"]');
+        const fileInput = document.getElementById('file');
+        if (paperclipButton && fileInput) {
+            fileInput.value = ''; // Очищаем значение input
+            paperclipButton.removeEventListener('click', openFileInput); // Удаляем старый обработчик
+            paperclipButton.addEventListener('click', openFileInput);    // Добавляем новый
+        }
+
+        // Добавляем обнуление текстового поля
+        const prompt = document.getElementById('prompt_field');
+        if (prompt) {
+            prompt.value = ''; // Очищаем поле ввода
+        }
+    }
+
+
+    function adjustTextAreaHeight(e) {
+        const el = e.target;
+        el.style.height = 'auto';
+        el.style.height = (el.scrollHeight) + 'px';
+        toggleButtonState();
+    }
+
+    function openFileInput() {
+        const fileInput = document.getElementById('file');
+        if (fileInput) fileInput.click();
+    }
+
+    function toggleButtonState() {
+            const prompt = document.getElementById('prompt_field');
+            const sendButton = document.querySelector('.button.right');
+            if (prompt.value.trim() === '') {
+                sendButton.classList.add('disabled');
+            } else {
+                sendButton.classList.remove('disabled');
+            }
+        }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const loader = document.getElementById('loader');
+        const overlay = document.getElementById('overlay');
+        const form = document.getElementById('uploadForm');
+        const prompt = document.getElementById('prompt_field');
+        const sidebar = document.getElementById('sidebar');
+
+        registerHamburgerEvents();
+        toggleButtonState();
+
+        
+
+    
+    // Обработчик события change для обновления выбранного файла
+    const fileInput = document.getElementById('file');
+    fileInput.addEventListener('change', () => {
+                const selectedFile = fileInput.files[0];
+                console.log('Выбран файл:', selectedFile);
+                // Здесь можно добавить дополнительные действия при выборе нового файла
+            });
+            
+                // form.addEventListener('submit', analyzeFile);
+                // reRegisterEvents();
+            });
+
+    document.querySelectorAll('textarea').forEach(el => {
+        el.setAttribute('style', 'height: ' + el.scrollHeight + 'px');
+        el.classList.add('auto');
+        el.addEventListener('input', e => {
+            el.style.height = 'auto';
+            el.style.height = (el.scrollHeight) + 'px';
+            toggleButtonState();
+        });
+        const form = document.getElementById('uploadForm');
+
+        // form.addEventListener('submit', analyzeFile);
+        // reRegisterEvents();
+
+    });
+
+                
+    </script>
+</body>
+</html>
